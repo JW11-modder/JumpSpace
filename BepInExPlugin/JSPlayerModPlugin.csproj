@@ -1,0 +1,88 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>jw11-modder.JSPlayerModPlugin</AssemblyName>
+    <Product>JS Player Mod Plugin</Product>
+    <Version>1.0.3</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+      https://nuget.samboy.dev/v3/index.json
+    </RestoreAdditionalProjectSources>
+    <RootNamespace>JSPlayerModPlugin</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" IncludeAssets="compile" />
+    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\core\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Assembly-CSharp-firstpass.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2Cppmscorlib">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Il2Cppmscorlib.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Il2CppSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="Keepsake.Common">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Keepsake.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="Keepsake.Simulation.Data">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Keepsake.Simulation.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="UniRx">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\UniRx.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Unity.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.InputSystem.ForUI">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Unity.InputSystem.ForUI.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Netcode.Runtime">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Unity.Netcode.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputForUIModule">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.InputForUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputModule">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.InputModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIElementsModule">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.UIElementsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\unity-libs\UnityEngine.UIModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="COPY &quot;$(TargetPath)&quot; &quot;$(GamePath)/BepInEx/plugins&quot;" />
+	</Target>
+</Project>
