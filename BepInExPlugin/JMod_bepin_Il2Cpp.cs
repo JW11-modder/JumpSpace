@@ -26,7 +26,7 @@ namespace JSPlayerModPlugin
         public const string GUID = "jw11-modder.JMod";
         public const string NAME = "JMod_bepin";
         public const string AUTHOR = "jw11-modder";
-        public const string VERSION = "1.0.0";
+        public const string VERSION = "1.0.4";
 
         public static ConfigEntry<bool> JModEnabled;
 
@@ -41,13 +41,9 @@ namespace JSPlayerModPlugin
         private static GUIStyle JModStyleP = new GUIStyle();
         private static GUIStyle JModStylePV = new GUIStyle();
         private static GUIStyle JModStyleB = new GUIStyle();
-        private static GUIStyle JModStyleS = new GUIStyle();
-        private static GUIStyle JModStyleST = new GUIStyle();
         private static GUIStyle JModStyleBlank = new GUIStyle();
 
         private static Color JModColor = new Color(0.0f, 0.85f, 0.85f);
-
-        private static Texture2D sliderBackground = new Texture2D(1, 1, TextureFormat.RGBAFloat, false);
 
         private enum ConfigCategory
         {
@@ -96,34 +92,6 @@ namespace JSPlayerModPlugin
                     return;
             }
         }
-        /*public static void Log( object message)
-            => Log( message, LogType.Log);
-
-        public static void LogWarning( object message)
-            => Log( message, LogType.Warning);
-
-        public static void LogError( object message)
-            => Log( message, LogType.Error);
-
-        internal static override void Log( object message, LogType logType)
-        {
-            string log = message?.ToString() ?? "";
-
-            switch (logType)
-            {
-                case LogType.Log:
-                case LogType.Assert:
-                    Logger.LogMessage(log); break;
-
-                case LogType.Warning:
-                    Logger.LogWarning(log); break;
-
-                case LogType.Error:
-                case LogType.Exception:
-                    Logger.LogError(log); break;
-            }
-        }*/
-
 
         public void ConfFileInit()
         {
@@ -157,12 +125,10 @@ namespace JSPlayerModPlugin
 
         public void JModInit(BasePlugin instance)
         {
-            //Logger = base.;
             jPlugin = instance;
             jPlugin.Log.LogInfo("Starting JMod init!");
             
             ConfFileInit();
-            //base.enabled = true;
 
             JModEnabled = jPlugin.Config.Bind("JMod", "Mod Enabled", true, "Enable config mod GUI");
 
@@ -179,16 +145,6 @@ namespace JSPlayerModPlugin
             JModStylePV.fontSize = 16;
             JModStylePV.fontStyle = FontStyle.Bold;
             JModStylePV.normal.textColor = JModColor;
-
-
-            //JModStyleB.normal.background = consoleBackground;
-
-            //consoleBackground.SetPixel(0, 0, new Color(0.003f, 0.003f, 0.01f, 0.92f));
-            //consoleBackground.Apply();
-
-            sliderBackground.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.05f));
-            sliderBackground.Apply();
-
 
             jPlugin.Log.LogInfo("JMod Init complete!");
             if (!JModEnabled.Value)
@@ -245,6 +201,7 @@ namespace JSPlayerModPlugin
                 string multLabel = jPlugin.Config[definition].Description.Description;
                 float minValue;
                 float maxValue;
+                float step;
                 if (jPlugin.Config[definition].Description.AcceptableValues != null)
                 {
                     AcceptableValueRange<float> minMaxValues = (AcceptableValueRange<float>)jPlugin.Config[definition].Description.AcceptableValues;
@@ -256,24 +213,26 @@ namespace JSPlayerModPlugin
                     minValue = 1f;
                     maxValue = 20f;
                 }
+                if (maxValue < 10)
+                    step = 0.1f;
+                else
+                    step = 0.5f;
                 multLabel += " (" + minValue.ToString() + " - " + maxValue.ToString() + ")";
                 GUI.Label(new Rect(xAxis, yAxis, 680, 20), multLabel, JModStyleP);
                 float value = (float)jPlugin.Config[definition].BoxedValue;
                 if (GUI.Button(new Rect(xAxis + 680, yAxis, 40, 20), " - "))
                 {
                     if (value > minValue)
-                        jPlugin.Config[definition].BoxedValue = value - 0.5f;
+                        jPlugin.Config[definition].BoxedValue = value - step;
                 }
                 GUI.Label(new Rect(xAxis + 730, yAxis, 40, 20), value.ToString("0.0"), JModStylePV);
                 if (GUI.Button(new Rect(xAxis + 780, yAxis, 40, 20), " + "))
                 {
                     if (value < maxValue)
-                        jPlugin.Config[definition].BoxedValue = value + 0.5f;
+                        jPlugin.Config[definition].BoxedValue = value + step;
                 }
                 
-                yAxis += 25;
-                //jPlugin.Config[definition].BoxedValue = GUI.HorizontalSlider(new Rect(xAxis, yAxis, 810, 20), value, minValue, maxValue, JModStyleS, JModStyleST);
-                yAxis += 15;
+                yAxis += 35;
             }
         }
 
@@ -309,10 +268,7 @@ namespace JSPlayerModPlugin
                     if (value < maxValue)
                         jPlugin.Config[definition].BoxedValue = value + 1;
                 }
-                yAxis += 25;
-
-                //jPlugin.Config[definition].BoxedValue = (int)GUI.HorizontalSlider(new Rect(xAxis, yAxis, 810, 20), value, minValue, maxValue, JModStyleS, JModStyleST);
-                yAxis += 15;
+                yAxis += 35;
             }
         }
 
@@ -321,8 +277,8 @@ namespace JSPlayerModPlugin
             if (showCheatsPopup)
             {
 
-                Rect jModWindowRect = new Rect(Screen.width / 2 - 425, Screen.height / 2 - 425, 850, 850);
-                Rect _screenRect = new Rect(0, 0, Screen.width, Screen.height);
+                Rect jModWindowRect = new(Screen.width / 2 - 425, Screen.height / 2 - 425, 850, 850);
+                Rect _screenRect = new(0, 0, Screen.width, Screen.height);
 
                 var yAxis = 40;
                 var xAxis = 20;
@@ -337,11 +293,6 @@ namespace JSPlayerModPlugin
                 JModStyleB.fontSize = 24;
                 JModStyleB.fontStyle = FontStyle.Bold;
                 JModStyleB.normal.textColor = JModColor;
-
-                JModStyleS = GUI.skin.GetStyle("horizontalslider");
-                JModStyleS.normal.background = sliderBackground;
-
-                JModStyleST = GUI.skin.GetStyle("horizontalsliderthumb");
 
                 GUI.BeginGroup(jModWindowRect);
                 for (int i = 1; i < 4; i++)

@@ -8,6 +8,7 @@ using Keepsake;
 using Keepsake.Framework.Networking.Logic;
 using Keepsake.Gold;
 using Keepsake.HyperSpace.GameplayFeatures.Campaigns;
+using Keepsake.HyperSpace.GameplayFeatures.Pickupables.RocketLauncher;
 using Keepsake.Modal;
 using Keepsake.Pickupables.GenericWeapon;
 using System;
@@ -28,22 +29,22 @@ public class Plugin : BasePlugin
 
     public JMod jMod = new();
     public static ConfigEntry<bool> configNoPlayerDamage;
-    public static ConfigEntry<bool> configNoPlayerShipDamage;
+    public static ConfigEntry<bool> configNoPlayerShipHealthDamage;
+    public static ConfigEntry<bool> configNoPlayerShipShieldDamage;
     public static ConfigEntry<bool> configNoCraftCost;
     public static ConfigEntry<bool> configNoShipAmmoCost;
     public static ConfigEntry<bool> configNoPlayerReload;
     public static ConfigEntry<bool> configInstantBoost;
-    //public static ConfigEntry<bool> configInfiniteJump;
+    public static ConfigEntry<bool> configInfiniteJump;
 
     public static ConfigEntry<float> configMateriaMultiplier;
     public static ConfigEntry<float> configPlayerDamageMultiplier;
     public static ConfigEntry<float> configPlayerShipDamageMultiplier;
+    public static ConfigEntry<float> configPlayerSpeedMultiplier;
     public static ConfigEntry<float> configPlayerXPMultiplier;
     public static ConfigEntry<float> configBoostTimeMult;
     public static ConfigEntry<float> configIngotMultiplier;
     public static ConfigEntry<float> configCreditsMultiplier;
-    //public static ConfigEntry<float> configPlayerSpeedMultiplier;
-    //public static ConfigEntry<float> configPlayerJumpMultiplier;
 
 
 
@@ -58,10 +59,14 @@ public class Plugin : BasePlugin
                                     "DisablePlayerDamage",
                                     false,
                                     "Disable damage to player");
-        configNoPlayerShipDamage = Config.Bind("Toggles",
+        configNoPlayerShipHealthDamage = Config.Bind("Toggles",
                                     "DisablePlayerShipDamage",
                                     false,
-                                    "Disable damage to player's ship");
+                                    "Disable damage to player ship's health");
+        configNoPlayerShipShieldDamage = Config.Bind("Toggles",
+                                    "DisablePlayerShipDamage",
+                                    false,
+                                    "Disable damage to player ship's shields");
         configNoShipAmmoCost = Config.Bind("Toggles",
                                     "EnableNoShipAmmoCost",
                                     false,
@@ -78,10 +83,10 @@ public class Plugin : BasePlugin
                                     "EnableInstantBoost",
                                     false,
                                     "Enable instant ship boost");
-        /*configInfiniteJump = Config.Bind("Toggles",
+        configInfiniteJump = Config.Bind("Toggles",
                                     "EnableInfiniteJump",
                                     false,
-                                    "Enable infinite double jump");*/
+                                    "Enable infinite double jump");
 
 
         configPlayerDamageMultiplier = Config.Bind("MultFloat",
@@ -92,6 +97,10 @@ public class Plugin : BasePlugin
                                     "PlayerShipDamageMultiplier",
                                     1f,
                                     "Player damage multiplier (spaceship)");
+        configPlayerSpeedMultiplier = Config.Bind("MultFloat",
+                                    "PlayerSpeedMultiplier",
+                                    1f,
+                                    "Player speed multiplier (on foot)");
         configBoostTimeMult = Config.Bind("MultFloat",
                                     "BoostTimeMult",
                                     1f,
@@ -113,14 +122,6 @@ public class Plugin : BasePlugin
                                     1f,
                                     "Mission player XP reward multiplier");
 
-        /*configPlayerSpeedMultiplier = Config.Bind("MultFloat",
-                                    "PlayerSpeedMultiplier",
-                                    1f,
-                                    "Multiply player speed by this amount");*/
-        /*configPlayerJumpMultiplier = Config.Bind("MultFloat",
-                                    "PlayerJumpMultiplier",
-                                    1f,
-                                    "Multiply player jump height by this amount");*/
 
 
 
@@ -131,7 +132,7 @@ public class Plugin : BasePlugin
         IL2CPPBase.Initialize(this);
     }
 
-    //// HealthComponent_Base
+    //configNoPlayerDamage
 
     [HarmonyPatch(typeof(HealthComponent_Base), nameof(HealthComponent_Base.DealDamage))]
     class HealthComponentPatch4
@@ -150,6 +151,8 @@ public class Plugin : BasePlugin
         }
     }
 
+    //configNoPlayerShipHealthDamage
+
     // Playership_DamageController ApplyDamageToShipCore(int damage)
     [HarmonyPatch(typeof(Playership_DamageController), nameof(Playership_DamageController.ApplyDamageToShipCore))]
     [HarmonyPatch(typeof(Playership_DamageController), nameof(Playership_DamageController.DelayedDamage))]
@@ -157,7 +160,7 @@ public class Plugin : BasePlugin
     {
         static bool Prefix(ref int damage, ref Playership_DamageController __instance)
         {
-            if (!configNoPlayerShipDamage.Value)
+            if (!configNoPlayerShipHealthDamage.Value)
             {
                 //Log.LogInfo("SHIP CORE DAMAGE ALLOWED - Damage value: " + damage);
                 return true;
@@ -173,7 +176,7 @@ public class Plugin : BasePlugin
     {
         static void Postfix(ref shipref __instance)
         {
-            if (!configNoPlayerShipDamage.Value)
+            if (!configNoPlayerShipHealthDamage.Value)
             {
                 //Log("SHIP CORE DELAYED DAMAGE ALLOWED - Damage value: " + damage);
                 return;
@@ -189,6 +192,24 @@ public class Plugin : BasePlugin
 
         }
     }
+
+    [HarmonyPatch(typeof(SpaceShip_BaseComponent), nameof(SpaceShip_BaseComponent.SetComponentHealthStatus))]
+    class Playership_BaseComponentPatch1
+    {
+        static bool Prefix(ref SpaceShip_BaseComponent.ComponentHealthStatus newCritical)
+        {
+            if (!configNoPlayerShipHealthDamage.Value)
+            {
+                //Log.LogInfo("SHIP DAMAGE ALLOWED - New component status: " + newCritical.ToString());
+                return true;
+            }
+            newCritical = SpaceShip_BaseComponent.ComponentHealthStatus.Healthy;
+            //Log.LogInfo("!!NO SHIP DAMAGE ALLOWED!! - New component status: " + newCritical.ToString());
+            return true;
+        }
+    }
+
+    //configPlayerShipDamageMultiplier
 
     [HarmonyPatch(typeof(SpaceShip_Cannon_Base), nameof(SpaceShip_Cannon_Base.SafeStart))]
     class SpaceShip_Cannon_BasePatch1
@@ -237,8 +258,7 @@ public class Plugin : BasePlugin
         }
     }
 
-
-
+    //configNoPlayerShipShieldDamage
 
     // Keepsake.ShieldUnitsManager !!! DealDamageToShields(int finalDamage, DamageInfo damageInfo, out int coreDamage)
 
@@ -247,7 +267,7 @@ public class Plugin : BasePlugin
     {
         static void Postfix(ref int plateHealth, ref ShieldUnitController __instance)
         {
-            if (!configNoPlayerShipDamage.Value)
+            if (!configNoPlayerShipShieldDamage.Value)
             {
                 //Log.LogInfo("SHIP SHIELD DAMAGE ALLOWED");
                 return;
@@ -262,23 +282,7 @@ public class Plugin : BasePlugin
         }
     }
 
-    // SpaceShip_BaseComponent
-    [HarmonyPatch(typeof(SpaceShip_BaseComponent), nameof(SpaceShip_BaseComponent.SetComponentHealthStatus))]
-    class Playership_BaseComponentPatch1
-    {
-        static bool Prefix(ref SpaceShip_BaseComponent.ComponentHealthStatus newCritical)
-        {
-            if (!configNoPlayerShipDamage.Value)
-            {
-                //Log.LogInfo("SHIP DAMAGE ALLOWED - New component status: " + newCritical.ToString());
-                return true;
-            }
-            newCritical = SpaceShip_BaseComponent.ComponentHealthStatus.Healthy;
-            //Log.LogInfo("!!NO SHIP DAMAGE ALLOWED!! - New component status: " + newCritical.ToString());
-            return true;
-        }
-    }
-
+    //configNoShipAmmoCost
 
 
     [HarmonyPatch(typeof(PlayerShip_IndividualTurretController), nameof(PlayerShip_IndividualTurretController.ExpendAmmunition))]
@@ -298,6 +302,7 @@ public class Plugin : BasePlugin
         }
     }
 
+    //configNoCraftCost
 
     [HarmonyPatch(typeof(Assembler), nameof(Assembler.CraftBlueprint))]
     class Assembler_CraftBlueprintPatch1
@@ -315,6 +320,8 @@ public class Plugin : BasePlugin
         }
     }
 
+    //configMateriaMultiplier
+
     [HarmonyPatch(typeof(Disassembler), nameof(Disassembler.Disassemble))]
     class DisassemblePatch1
     {
@@ -331,6 +338,8 @@ public class Plugin : BasePlugin
             return true;
         }
     }
+
+    //configNoPlayerReload
 
     // Keepsake.PlayerPickupableItemHandler
     //Handle_AmmoInMagChanged(int ammoInMag)
@@ -353,26 +362,39 @@ public class Plugin : BasePlugin
             return true;
         }
     }
-    //ItemHeldPersistentPickupable.PickupableBlackboardData.m_AmmoInMag;
-
-    // Keepsake.Pickupables.GenericWeapon.PickupableItemFirstPerson_GenericWeapon Reload
-    /*[HarmonyPatch(typeof(PickupableItemFirstPerson_GenericWeapon), nameof(PickupableItemFirstPerson_GenericWeapon.Reload))]
-    class ReloadPatch1
+    [HarmonyPatch(typeof(PickupableItem_Railgun), nameof(PickupableItem_Railgun.FireRailgunProjectile))]
+    class RailgunPatch1
     {
-        static void Postfix(ref PickupableItemFirstPerson_GenericWeapon __instance)
+        static void Postfix(ref PickupableItem_Railgun __instance)
         {
-            if (!configNoPlayerAmmoCost.Value)
+            if (!configNoPlayerReload.Value)
             {
-                Log.LogInfo("AMMO DECREASE ALLOWED");
                 return;
             }
-            if (__instance.Ammo < __instance.MaxAmmoStat.Value)
-            {
-                Log.LogInfo("AMMO REPLENISHED: " + __instance.Ammo);
-            }
+            //Log("RAILGUN NO RELOAD - Current resource: " + __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value);
+            //Log("RAILGUN NO RELOAD - Max resource to carry: " + __instance.m_ItemData.m_MaxResourceAmountToCarry);
+            __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
         }
-    }*/
+    }
+    // Il2CppKeepsake.HyperSpace.GameplayFeatures.Pickupables.RocketLauncher.PickupableItem_RPG_FirstPerson
 
+    [HarmonyPatch(typeof(PickupableItem_RPG_FirstPerson), nameof(PickupableItem_RPG_FirstPerson.FireReleased))]
+    class RPGPatch1
+    {
+        static void Postfix(ref PickupableItem_RPG_FirstPerson __instance)
+        {
+            if (!configNoPlayerReload.Value)
+            {
+                return;
+            }
+            //Log("RPG NO RELOAD - Current resource: " + __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value);
+            //Log("RPG NO RELOAD - Max resource to carry: " + __instance.m_ItemData.m_MaxResourceAmountToCarry);
+            __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+        }
+    }
+
+
+    // configPlayerDamageMultiplier
 
     // PickupableItemFirstPerson_Base !!
     [HarmonyPatch(typeof(PickupableItemFirstPerson_Base), nameof(PickupableItemFirstPerson_Base.ShootProjectile))]
@@ -408,201 +430,7 @@ public class Plugin : BasePlugin
         }
     }
 
-    /*[HarmonyPatch(typeof(Keepsake.Gold.Instapickup_Credits), nameof(Keepsake.Gold.Instapickup_Credits.CollectedCreditsServerRpc))]
-    class Instapickup_CreditsPatch1
-    {
-        static bool Prefix(ref int amount)
-        {
-            if (configCreditsMultiplier.Value <= 1)
-            {
-                Log.LogInfo("CREDITS MULTIPLIER NORMAL - Credits pickup value: " + amount.ToString());
-                return true;
-            }
-            amount *= configCreditsMultiplier.Value;
-            Log.LogInfo("CREDITS MULTIPLIER " + configCreditsMultiplier.Value.ToString() + " - Credits pickup value: " + amount.ToString());
-            return true;
-        }
-    }*/
-
-
-    // Player_MovementHandler
-    //MaxMovementSpeed
-    /*MaxMovementSpeedWithSprint
-    [HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.MaxMovementSpeed), MethodType.Getter)]
-    [HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.MaxMovementSpeedWithSprint), MethodType.Getter)]
-    class Player_MovementHandlerPatch1
-    {
-        static void Postfix(ref float __result)
-        {
-            if (configPlayerSpeedMultiplier.Value <= 1)
-            {
-                Log.LogInfo("PLAYER SPEED NORMAL - value: " + __result.ToString());
-                return;
-            }
-            __result *= configPlayerSpeedMultiplier.Value;
-            Log.LogInfo("PLAYER SPEED MULTIPLIER " + configPlayerSpeedMultiplier.Value.ToString() + " - value: " + __result.ToString());
-        }
-    }
-
-    [HarmonyPatch(typeof(PlayerSettings), nameof(PlayerSettings.WalkSpeed), MethodType.Getter)]
-    class PlayerSettingsPatch1
-    {
-        static void Postfix(ref ComposableProperty<float> __result)
-        {
-            if (configPlayerSpeedMultiplier.Value <= 1)
-            {
-                Log.LogInfo("PLAYER SPEED NORMAL - value: " + __result.ToString());
-                return;
-            }
-            ComposableProperty<float> value = __result;
-            value.m_Value *= configPlayerSpeedMultiplier.Value;
-            __result = value;
-            Log.LogInfo("PLAYER SPEED MULTIPLIER " + configPlayerSpeedMultiplier.Value.ToString() + " - value: " + __result.ToString());
-        }
-    }*/
-
-
-
-    //bool AllowDoubleJump
-    /*[HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.AllowDoubleJump), MethodType.Getter)]
-    class Player_MovementHandlerPatch2
-    {
-        static void Postfix(ref bool __result)
-        {
-            if (!configInfiniteJump.Value)
-            {
-                Log.LogInfo("PLAYER JUMP NORMAL");
-                return;
-            }
-            __result =true;
-            Log.LogInfo("PLAYER JUMP INFINITE - value: " + __result.ToString());
-        }
-    }*/
-
-    /*[HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.AllowDoubleJump), MethodType.Setter)]
-    class Player_MovementHandlerPatch3
-    {
-        static bool Prefix(ref bool value)
-        {
-            if (!configInfiniteJump.Value)
-            {
-                Log.LogInfo("PLAYER JUMP NORMAL 2");
-                return true;
-            }
-            value = true;
-            Log.LogInfo("PLAYER JUMP INFINITE 2 - value: " + value.ToString());
-            return true;
-        }
-    }*/
-
-    // Keepsake.PlayerCharacterBlackboardData NetworkReactiveProperty<bool> m_PerformedDoubleJump
-    /*[HarmonyPatch(typeof(PlayerCharacterBlackboardData), nameof(PlayerCharacterBlackboardData.m_PerformedDoubleJump), MethodType.Getter)]
-    class PlayerCharacterBlackboardDataPatch1
-    {
-        static void Postfix(ref NetworkReactiveProperty<bool> __result, ref PlayerCharacterBlackboardData __instance)
-        {
-            if (!configInfiniteJump.Value)
-            {
-                Log.LogInfo("PLAYER JUMP NORMAL 3");
-                return;
-            }
-            __result.Value = false;
-            Log.LogInfo("PLAYER JUMP INFINITE 3 - value: " + __result.Value.ToString());
-        }
-    }*/
-
-    //m_PressedJump
-    /*[HarmonyPatch(typeof(DoubleJumpAbility), nameof(DoubleJumpAbility.m_PressedJump), MethodType.Getter)]
-    class DoubleJumpAbilityPatch1
-    {
-        static void Postfix(ref bool __result, ref DoubleJumpAbility __instance)
-        {
-            if (!configInfiniteJump.Value)
-            {
-                Log.LogInfo("PLAYER JUMP NORMAL 2");
-                return;
-            }
-            if (__result == true)
-                __instance.ShouldActivate();
-            Log.LogInfo("PLAYER JUMP INFINITE 2 - value: " + __result.ToString());
-        }
-    }*/
-
-    // ShouldDeactivate
-    /*[HarmonyPatch(typeof(DoubleJumpAbility), nameof(DoubleJumpAbility.ShouldDeactivate))]
-    class DoubleJumpAbilityPatch2
-    {
-        static void Postfix(ref bool __result, ref DoubleJumpAbility __instance)
-        {
-            if (!configInfiniteJump.Value)
-            {
-                Log.LogInfo("PLAYER JUMP NORMAL 4");
-                return;
-            }
-            if (__instance.PlayerController.didStart)
-            {
-                //__instance.ShouldActivate();
-                //__result = false;
-                Log.LogInfo("PLAYER JUMP INFINITE 4 - value: " + __result.ToString());
-            }
-        }
-    }*/
-
-    //GetJumpHeightAddition
-    /*[HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.GetJumpHeightAddition))]
-    class Player_MovementHandlerPatch1
-    {
-        static void Postfix(ref float __result)
-        {
-            if (configPlayerJumpMultiplier.Value <= 1)
-            {
-                Log.LogInfo("PLAYER JUMP HEIGHT NORMAL - value: " + __result.ToString());
-                return;
-            }
-            __result *= configPlayerJumpMultiplier.Value;
-            Log.LogWarning("PLAYER JUMP HEIGHT MULTIPLIER " + configPlayerJumpMultiplier.Value.ToString() + " - value: " + __result.ToString());
-
-        }
-    }*/
-
-    // Keepsake.FloorMovementAbility
-    /*[HarmonyPatch(typeof(FloorMovementAbility), nameof(FloorMovementAbility.OnActivate))]
-    class FloorMovementAbilityPatch1
-    {
-        static bool Prefix(ref FloorMovementAbility __instance)
-        {
-            if (configPlayerSpeedMultiplier.Value <= 1)
-            {
-                Log.LogInfo("PLAYER SPEED NORMAL 3 ");
-                return true;
-            }
-            if (__instance.m_PlayerSettings != null)
-            {
-                __instance.m_PlayerSettings.WalkSpeed.m_Value *= configPlayerSpeedMultiplier.Value;
-                __instance.m_PlayerSettings.WalkSpeedAcceleration.m_Value *= configPlayerSpeedMultiplier.Value;
-                Log.LogWarning("PLAYER SPEED MULTIPLIER 3 : " + configPlayerSpeedMultiplier.Value.ToString() + " - speed value: " + __instance.m_PlayerSettings.WalkSpeed.m_Value.ToString());
-            }
-
-            return true;
-        }
-    }*/
-
-
-
-    /*[HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.GetMoveSpeedAddition))]
-    class Player_MovementHandlerPatch2
-    {
-        static void Postfix(ref float __result)
-        {
-            if (configPlayerSpeedMultiplier.Value <= 1)
-            {
-                Log.LogInfo("PLAYER SPEED NORMAL - value: " + __result.ToString());
-                return;
-            }
-            __result *= configPlayerSpeedMultiplier.Value;
-            Log.LogWarning("PLAYER SPEED MULTIPLIER " + configPlayerSpeedMultiplier.Value.ToString() + " - value: " + __result.ToString());
-        }
-    }*/
+    // configInstantBoost
 
     // SpaceShip_EngineController
     // BoostRechargeTime
@@ -619,6 +447,48 @@ public class Plugin : BasePlugin
 
         }
     }
+
+    // configInfiniteJump
+
+    [HarmonyPatch(typeof(DoubleJumpAbility), nameof(DoubleJumpAbility.ShouldActivate))]
+    class DoubleJumpAbilityPatch1
+    {
+        static void Postfix(ref bool __result)
+        {
+            if (!configInfiniteJump.Value)
+            {
+                return;
+            }
+            if (Keepsake.HyperSpace.NewInputSystem.InputManager.IsActionPressed(Keepsake.HyperSpace.NewInputSystem.InputManager.InputKeys.Jump))
+            {
+                __result = true;
+            }
+
+        }
+    }
+
+    // configPlayerSpeedMultiplier
+
+    // Il2Cpp.Player_MovementHandler
+    [HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.AfterCharacterUpdate))]
+    class LocalVelocityPatch1
+    {
+        static void Postfix(ref Player_MovementHandler __instance)
+        {
+            if (configPlayerSpeedMultiplier.Value <= 1 || !__instance.IsOnGround)
+            {
+                return;
+            }
+            Vector3 vectorMult = new Vector3(configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value);
+            Vector3 localV = Vector3.Scale(__instance.LocalMovementVelocity, vectorMult);
+            float maxSpeed = __instance.MaxMovementSpeed * configPlayerSpeedMultiplier.Value;
+            localV = Vector3.ClampMagnitude(localV, maxSpeed);
+            //Log("MovementHandler sprint local velocity multiplied: " + localV.magnitude + " sprint time " + __instance.SprintElapsedTime);
+            __instance.LocalMovementVelocity = localV;
+        }
+    }
+
+    //configBoostTimeMult
 
     // BoostRechargeTime
     [HarmonyPatch(typeof(SpaceShip_EngineController), nameof(SpaceShip_EngineController.BoostTime), MethodType.Getter)]
