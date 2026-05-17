@@ -2,6 +2,8 @@
 using Il2Cpp;
 using Il2CppKeepsake;
 using Il2CppKeepsake.HyperSpace.GameplayFeatures.Campaigns;
+using Il2CppKeepsake.HyperSpace.GameplayFeatures.Pickupables.RocketLauncher;
+using Il2CppKeepsake.HyperSpace.NewInputSystem;
 using MelonLoader;
 using MelonLoader.Preferences;
 using MonoMod.RuntimeDetour;
@@ -10,10 +12,11 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
+using static MelonLoader.MelonLogger;
 
 
 
-[assembly: MelonInfo(typeof(JSMelonMod.Core), "jw11-modder.JSMelonLoaderMod", "1.0.3", "jw11-modder", null)]
+[assembly: MelonInfo(typeof(JSMelonMod.Core), "jw11-modder.JSMelonLoaderMod", "1.0.4", "jw11-modder", null)]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 
 namespace JSMelonMod
@@ -26,11 +29,13 @@ namespace JSMelonMod
         private static MelonPreferences_Category ToggleCategory;
 
         private static MelonPreferences_Entry<bool> configNoPlayerDamage;
-        private static MelonPreferences_Entry<bool> configNoPlayerShipDamage;
+        private static MelonPreferences_Entry<bool> configNoPlayerShipHealthDamage;
+        private static MelonPreferences_Entry<bool> configNoPlayerShipShieldDamage;
         private static MelonPreferences_Entry<bool> configNoCraftCost;
         private static MelonPreferences_Entry<bool> configNoShipAmmoCost;
         private static MelonPreferences_Entry<bool> configNoPlayerReload;
         private static MelonPreferences_Entry<bool> configInstantBoost;
+        private static MelonPreferences_Entry<bool> configInfiniteJump;
 
         private static MelonPreferences_Entry<float> configPlayerDamageMultiplier;
         private static MelonPreferences_Entry<float> configPlayerShipDamageMultiplier;
@@ -53,11 +58,9 @@ namespace JSMelonMod
         private static GUIStyle JModStyleP = new GUIStyle();
         private static GUIStyle JModStylePV = new GUIStyle();
         private static GUIStyle JModStyleB = new GUIStyle();
-        private static GUIStyle JModStyleS = new GUIStyle();
-        private static GUIStyle JModStyleST = new GUIStyle();
         private static GUIStyle JModStyleBlank = new GUIStyle();
 
-        private static Color JModColor = new Color(0.0f, 0.85f, 0.85f);
+        private static Color JModColor = new(0.0f, 0.85f, 0.85f);
 
         private static Rect jModWindowRect;
         private static Rect _screenRect;
@@ -143,14 +146,14 @@ namespace JSMelonMod
             }
         }
 
-        // configNoPlayerShipDamage
+        // configNoPlayerShipHealthDamage
 
         [HarmonyPatch(typeof(Playership_DamageController), nameof(Playership_DamageController.ApplyDamageToShipCore))]
         class Playership_DamageControllerPatch1
         {
             static bool Prefix(ref int damage, ref Playership_DamageController __instance)
             {
-                if (!configNoPlayerShipDamage.Value)
+                if (!configNoPlayerShipHealthDamage.Value)
                 {
                     //Log("SHIP CORE DAMAGE ALLOWED - Damage value: " + damage);
                     return true;
@@ -166,7 +169,7 @@ namespace JSMelonMod
         {
             static bool Prefix(ref int damage, ref Playership_DamageController __instance)
             {
-                if (!configNoPlayerShipDamage.Value)
+                if (!configNoPlayerShipHealthDamage.Value)
                 {
                     //Log("SHIP CORE DELAYED DAMAGE ALLOWED - Damage value: " + damage);
                     return true;
@@ -182,7 +185,7 @@ namespace JSMelonMod
         {
             static void Postfix(ref shipref __instance)
             {
-                if (!configNoPlayerShipDamage.Value)
+                if (!configNoPlayerShipHealthDamage.Value)
                 {
                     //Log("SHIP CORE DELAYED DAMAGE ALLOWED - Damage value: " + damage);
                     return;
@@ -199,12 +202,14 @@ namespace JSMelonMod
             }
         }
 
+        //configNoPlayerShipShieldDamage
+
         [HarmonyPatch(typeof(ShieldUnitController), nameof(ShieldUnitController.OnPlateHealthChanged))]
         class ShieldUnitControllerPatch1
         {
             static void Postfix(ref int plateHealth, ref ShieldUnitController __instance)
             {
-                if (!configNoPlayerShipDamage.Value)
+                if (!configNoPlayerShipShieldDamage.Value)
                 {
                     //Log("SHIP SHIELD DAMAGE ALLOWED");
                     return;
@@ -224,7 +229,7 @@ namespace JSMelonMod
         {
             static bool Prefix(ref SpaceShip_BaseComponent.ComponentHealthStatus newCritical)
             {
-                if (!configNoPlayerShipDamage.Value)
+                if (!configNoPlayerShipHealthDamage.Value)
                 {
                     //Log("SHIP DAMAGE ALLOWED - New component status: " + newCritical.ToString());
                     return true;
@@ -306,6 +311,24 @@ namespace JSMelonMod
                 __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
             }
         }
+        // Il2CppKeepsake.HyperSpace.GameplayFeatures.Pickupables.RocketLauncher.PickupableItem_RPG_FirstPerson
+
+        [HarmonyPatch(typeof(PickupableItem_RPG_FirstPerson), nameof(PickupableItem_RPG_FirstPerson.FireReleased))]
+        class RPGPatch1
+        {
+            static void Postfix(ref PickupableItem_RPG_FirstPerson __instance)
+            {
+                if (!configNoPlayerReload.Value)
+                {
+                    return;
+                }
+                //Log("RPG NO RELOAD - Current resource: " + __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value);
+                //Log("RPG NO RELOAD - Max resource to carry: " + __instance.m_ItemData.m_MaxResourceAmountToCarry);
+                __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+            }
+        }
+
+
 
         // configInstantBoost
 
@@ -375,7 +398,7 @@ namespace JSMelonMod
             {
                 if (configPlayerShipDamageMultiplier.Value <= 1 || __instance.TracerProjectileData == null)
                 {
-                    Log("SHIP SafeStart CANNON DAMAGE NORMAL");
+                    Log("SHIP CANNON DAMAGE NORMAL");
                     return true;
                 }
                 ShipCannon currentCannon = new()
@@ -387,7 +410,7 @@ namespace JSMelonMod
                 if (!shipCannonsDict.ContainsKey(__instance.CombatStationID))
                 {
                     shipCannonsDict.Add(__instance.CombatStationID, currentCannon);
-                    Log("Added SHIP SafeStart CANNON Id " + __instance.CombatStationID);
+                    Log("Added SHIP CANNON Id " + __instance.CombatStationID);
                     __instance.TracerProjectileData.m_ShipHullDamage = currentCannon.hullDamage;
                     __instance.TracerProjectileData.m_ShipShieldDamage = currentCannon.shieldDamage;
                 }
@@ -396,12 +419,12 @@ namespace JSMelonMod
                     {
                         shipCannonsDict[__instance.CombatStationID].hullDamage = __instance.TracerProjectileData.m_ShipHullDamage * configPlayerShipDamageMultiplier.Value;
                         shipCannonsDict[__instance.CombatStationID].shieldDamage = __instance.TracerProjectileData.m_ShipShieldDamage * configPlayerShipDamageMultiplier.Value;
-                        Log("SHIP SafeStart CANNON Id " + __instance.CombatStationID + " Damage changed!");
+                        Log("SHIP CANNON Id " + __instance.CombatStationID + " Damage changed!");
                         __instance.TracerProjectileData.m_ShipHullDamage = currentCannon.hullDamage;
                         __instance.TracerProjectileData.m_ShipShieldDamage = currentCannon.shieldDamage;
                     }
 
-                Log("SHIP SafeStart CANNON Id " + __instance.CombatStationID + " HULL DAMAGE: " + __instance.TracerProjectileData.ShipHullDamage + " SHIELD DAMAGE: " + __instance.TracerProjectileData.ShipshieldDamage);
+                Log("SHIP CANNON Id " + __instance.CombatStationID + " HULL DAMAGE: " + __instance.TracerProjectileData.ShipHullDamage + " SHIELD DAMAGE: " + __instance.TracerProjectileData.ShipshieldDamage);
                 return true;
             }
         }
@@ -491,137 +514,44 @@ namespace JSMelonMod
 
         // configPlayerSpeedMultiplier
 
-        /*[HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.DoubleJump))]
-        class Player_MovementHandlerPatch1
+        // Il2Cpp.Player_MovementHandler
+        [HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.AfterCharacterUpdate))]
+        class LocalVelocityPatch1
         {
             static void Postfix(ref Player_MovementHandler __instance)
             {
-                if (configPlayerSpeedMultiplier.Value <= 1)
+                if (configPlayerSpeedMultiplier.Value <= 1 || !__instance.IsOnGround)
                 {
                     return;
                 }
-                __instance.AllowDoubleJump = true;
-                Log("Player_MovementHandler Double jump allowed!");
+                Vector3 vectorMult = new Vector3(configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value);
+                Vector3 localV = Vector3.Scale(__instance.LocalMovementVelocity, vectorMult);
+                float maxSpeed = __instance.MaxMovementSpeed * configPlayerSpeedMultiplier.Value;
+                localV = Vector3.ClampMagnitude(localV, maxSpeed);
+                //Log("MovementHandler sprint local velocity multiplied: " + localV.magnitude + " sprint time " + __instance.SprintElapsedTime);
+                __instance.LocalMovementVelocity = localV;
             }
-        }*/
+        }
 
+
+        // configInfiniteJump
         // Keepsake.PlayerGameplayAbility OnDeactivate
-        /*[HarmonyPatch(typeof(DoubleJumpAbility), nameof(DoubleJumpAbility.OnActivate))]
+        [HarmonyPatch(typeof(DoubleJumpAbility), nameof(DoubleJumpAbility.ShouldActivate))]
         class DoubleJumpAbilityPatch1
         {
-            static void Postfix(ref DoubleJumpAbility __instance)
+            static void Postfix(ref bool __result)
             {
-                if (configPlayerSpeedMultiplier.Value <= 1)
+                if (!configInfiniteJump.Value)
                 {
                     return;
                 }
-                if (__instance.BlackboardData != null)
+                if (Il2CppKeepsake.HyperSpace.NewInputSystem.InputManager.IsActionPressed(Il2CppKeepsake.HyperSpace.NewInputSystem.InputManager.InputKeys.Jump))
                 {
-                    //__instance.BlackboardData.m_PerformedDoubleJump.Value = false;
-                    //Log("DoubleJumpAbility OnActivate Double jump performed: " + __instance.BlackboardData.m_PerformedDoubleJump.Value);
-                    //Log("DoubleJumpAbility OnActivate Double jump pressed: " + __instance.m_PressedJump);
-                    //Log("DoubleJumpAbility OnActivate Double jump Handler allowed: " + __instance.MovementHandler.AllowDoubleJump);
-                    //Log("DoubleJumpAbility OnActivate Double jump should activate: " + __instance.ShouldActivate());
-                    //Log("DoubleJumpAbility OnActivate Double jump should deactivate: " + __instance.ShouldDeactivate());
+                    __result = true;
                 }
 
             }
-        }*/
-
-        /*[HarmonyPatch(typeof(DoubleJumpAbility), nameof(DoubleJumpAbility.OnDeactivate))]
-        class DoubleJumpAbilityPatch2
-        {
-            static void Postfix(ref DoubleJumpAbility __instance)
-            {
-                if (configPlayerSpeedMultiplier.Value <= 1)
-                {
-                    return;
-                }
-                if (__instance.BlackboardData != null)
-                {
-                    //__instance.BlackboardData.m_PerformedDoubleJump.Value = false;
-                    //Log("DoubleJumpAbility OnDeactivate Double jump performed: " + __instance.BlackboardData.m_PerformedDoubleJump.Value);
-                    //Log("DoubleJumpAbility OnDeactivate Double jump pressed: " + __instance.m_PressedJump);
-                    //Log("DoubleJumpAbility OnDeactivate Double jump Handler allowed: " + __instance.MovementHandler.AllowDoubleJump);
-                    //Log("DoubleJumpAbility OnDeactivate Double jump should activate: " + __instance.ShouldActivate());
-                    //Log("DoubleJumpAbility OnDeactivate Double jump should deactivate: " + __instance.ShouldDeactivate());
-                }
-
-            }
-        }*/
-
-        /*[HarmonyPatch(typeof(JumpAbility), nameof(JumpAbility.OnActivate))]
-        class JumpAbilityPatch1
-        {
-            static void Postfix(ref JumpAbility __instance)
-            {
-                if (configPlayerSpeedMultiplier.Value <= 1)
-                {
-                    return;
-                }
-                if (__instance.BlackboardData != null)
-                {
-                    __instance.BlackboardData.m_PerformedDoubleJump.Value = false;
-                    Log("JumpAbility OnActivate Double jump performed: " + __instance.BlackboardData.m_PerformedDoubleJump.Value);
-                    Log("JumpAbility OnActivate Double jump settings: " + __instance.m_PlayerSettings.ToString());
-                    Log("JumpAbility OnActivate Double jump Handler allowed: " + __instance.MovementHandler.AllowDoubleJump);
-                }
-
-            }
-        }*/
-
-        /*[HarmonyPatch(typeof(JumpAbility), nameof(JumpAbility.OnActivate))]
-        class JumpAbilityPatch2
-        {
-            static void Postfix(ref JumpAbility __instance)
-            {
-                if (configPlayerSpeedMultiplier.Value <= 1)
-                {
-                    return;
-                }
-                if (__instance.m_PlayerSettings != null)
-                {
-                    Log("JumpAbility SprintBonusSpeed old: " + __instance.m_PlayerSettings.SprintBonusSpeed.m_Value);
-                    __instance.m_PlayerSettings.SprintBonusSpeed.m_Value *= configPlayerSpeedMultiplier.Value;
-                    Log("JumpAbility SprintBonusSpeed new: " + __instance.m_PlayerSettings.SprintBonusSpeed.m_Value);
-                    Log("JumpAbility StandSpeed old: " + __instance.m_PlayerSettings.StandSpeed.m_Value);
-                    __instance.m_PlayerSettings.StandSpeed.m_Value *= configPlayerSpeedMultiplier.Value;
-                    Log("JumpAbility StandSpeed new: " + __instance.m_PlayerSettings.StandSpeed.m_Value);
-                    Log("JumpAbility WalkSpeed old: " + __instance.m_PlayerSettings.WalkSpeed.m_Value);
-                    __instance.m_PlayerSettings.WalkSpeed.m_Value *= configPlayerSpeedMultiplier.Value;
-                    Log("JumpAbility WalkSpeed new: " + __instance.m_PlayerSettings.WalkSpeed.m_Value);
-                    Log("JumpAbility WalkSpeedAcceleration old: " + __instance.m_PlayerSettings.WalkSpeedAcceleration.m_Value);
-                    __instance.m_PlayerSettings.WalkSpeedAcceleration.m_Value *= configPlayerSpeedMultiplier.Value;
-                    Log("JumpAbility WalkSpeedAcceleration new: " + __instance.m_PlayerSettings.WalkSpeedAcceleration.m_Value);
-                }
-
-            }
-        }*/
-
-        // Keepsake.PlayerParentController
-
-        /*[HarmonyPatch(typeof(PlayerParentController), nameof(PlayerParentController.SafeStart))]
-        class PlayerParentControllerPatch1
-        {
-            static void Postfix(ref PlayerParentController __instance)
-            {
-                if (configPlayerSpeedMultiplier.Value <= 1)
-                {
-                    return;
-                }
-                if (__instance.m_PlayerSettings != null)
-                {
-                    Log("PlayerParentController SafeStart");
-                    Log("PlayerParentController override speed: " + __instance.m_MovementHandler.m_OverrideSpeed);
-                    Log("PlayerParentController MAX_SPEED: " + PlayerController.MAX_SPEED);
-                    Log("PlayerParentController SprintBonusSpeed: " + __instance.m_MovementHandler.CurrentPlayerSettings.SprintBonusSpeed.Value);
-                    Log("PlayerParentController JumpHeight: " + __instance.m_MovementHandler.CurrentPlayerSettings.JumpHeight.Value);
-                    Log("PlayerParentController OF SprintBonusSpeed: " + __instance.m_MovementHandler.OnFootSettings.SprintBonusSpeed.Value);
-                    Log("PlayerParentController OF JumpHeight: " + __instance.m_MovementHandler.OnFootSettings.JumpHeight.Value);
-                }
-
-            }
-        }*/
+        }
 
         public override void OnInitializeMelon()
         {
@@ -631,15 +561,17 @@ namespace JSMelonMod
             ToggleCategory = MelonPreferences.CreateCategory("Toggles");
 
             configNoPlayerDamage = ToggleCategory.CreateEntry<bool>("configNoPlayerDamage", false, "Disable damage to player");
-            configNoPlayerShipDamage = ToggleCategory.CreateEntry<bool>("configNoPlayerShipDamage", false, "Disable damage to player's ship");
+            configNoPlayerShipHealthDamage = ToggleCategory.CreateEntry<bool>("configNoPlayerShipHealthDamage", false, "Disable damage to player ship's health");
+            configNoPlayerShipShieldDamage = ToggleCategory.CreateEntry<bool>("configNoPlayerShipShieldDamage", false, "Disable damage to player ship's shields");
             configNoShipAmmoCost = ToggleCategory.CreateEntry<bool>("configNoShipAmmoCost", false, "No reload and ammo cost (spaceship)");
             configNoPlayerReload = ToggleCategory.CreateEntry<bool>("configNoPlayerAmmoCost", false, "No reload and ammo cost (on foot)");
             configNoCraftCost = ToggleCategory.CreateEntry<bool>("configNoCraftCost", false, "No assembler craft cost");
             configInstantBoost = ToggleCategory.CreateEntry<bool>("configInstantBoost", false, "Enable instant ship boost");
+            configInfiniteJump = ToggleCategory.CreateEntry<bool>("configInfiniteJump", false, "Enable infinite double jump");
 
             configPlayerDamageMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerDamageMultiplier", 1f, "Player damage multiplier (on foot)", validator: new ValueRange<float>(1f, 20f));
             configPlayerShipDamageMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerShipDamageMultiplier", 1f, "Player damage multiplier (spaceship)", validator: new ValueRange<float>(1f, 20f));
-            //configPlayerSpeedMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerSpeedMultiplier", 1f, "Player speed multiplier", validator: new ValueRange<float>(1f, 10f));
+            configPlayerSpeedMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerSpeedMultiplier", 1f, "Player speed multiplier (on foot)", validator: new ValueRange<float>(1f, 5f));
             configBoostTimeMult = MultiplierFloatCategory.CreateEntry<float>("configBoostTimeMult", 1f, "Ship boost time multiplier", validator: new ValueRange<float>(1f, 20f));
             configMateriaMultiplier = MultiplierFloatCategory.CreateEntry<float>("configMateriaMultiplier", 1f, "Materia disassemble gains multiplier", validator: new ValueRange<float>(1f, 20f));
             configCreditsMultiplier = MultiplierFloatCategory.CreateEntry<float>("configCreditsMultiplier", 1f, "Mission credits reward multiplier", validator: new ValueRange<float>(1f, 20f));
@@ -698,9 +630,6 @@ namespace JSMelonMod
             }
 
             Log("Menu key: " + configMenuToggle.Value.ToString());
-
-
-            //HarmonyInstance.PatchAll();
 
             Log("JS Mod Initialized.");
 
@@ -856,19 +785,24 @@ namespace JSMelonMod
                     range = (ValueRange<float>)mult.Validator;
                 else
                     range = new ValueRange<float>(1f, 20f);
+                float step;
+                if (range.MaxValue < 10)
+                    step = 0.1f;
+                else
+                    step = 0.5f;
                 multLabel += " (" + range.MinValue.ToString() + " - " + range.MaxValue.ToString() + ")";
                 GUI.Label(new Rect(xAxis, yAxis, 680, 20), multLabel, JModStyleP);
 
                 if (GUI.Button(new Rect(xAxis + 680, yAxis, 40, 20), " - "))
                 {
                     if (mult.Value > range.MinValue)
-                        mult.Value -= 0.5f;
+                        mult.Value -= step;
                 }
                 GUI.Label(new Rect(xAxis + 730, yAxis, 40, 20), mult.Value.ToString("0.0"), JModStylePV);
                 if (GUI.Button(new Rect(xAxis + 780, yAxis, 40, 20), " + "))
                 {
                     if (mult.Value < range.MaxValue)
-                        mult.Value += 0.5f;
+                        mult.Value += step;
                 }
 
                 yAxis += 35;

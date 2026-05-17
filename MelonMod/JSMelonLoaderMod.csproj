@@ -6,8 +6,8 @@
 		<RootNamespace>JSMelonMod</RootNamespace>
 		<LangVersion>default</LangVersion>
 		<IsPackable>false</IsPackable>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
+		<AssemblyVersion>1.0.4</AssemblyVersion>
+		<FileVersion>1.0.4</FileVersion>
 		<NeutralLanguage>en-US</NeutralLanguage>
 		<AssemblyName>jw11-modder.JSMelonMod</AssemblyName>
 		<LangVersion>latest</LangVersion>
@@ -20,6 +20,9 @@
 	<ItemGroup>
 		<Reference Include="Assembly-CSharp">
 		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\Il2CppAssemblies\Assembly-CSharp.dll</HintPath>
+		</Reference>
+		<Reference Include="Il2CppInterop.Runtime">
+		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\net6\Il2CppInterop.Runtime.dll</HintPath>
 		</Reference>
 		<Reference Include="Il2CppKeepsake.Common">
 		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\Il2CppAssemblies\Il2CppKeepsake.Common.dll</HintPath>
