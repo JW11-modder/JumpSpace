@@ -10,13 +10,14 @@ using MonoMod.RuntimeDetour;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 using static MelonLoader.MelonLogger;
 
 
 
-[assembly: MelonInfo(typeof(JSMelonMod.Core), "jw11-modder.JSMelonLoaderMod", "1.0.4", "jw11-modder", null)]
+[assembly: MelonInfo(typeof(JSMelonMod.Core), "jw11-modder.JSMelonLoaderMod", "1.0.5", "jw11-modder", null)]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 
 namespace JSMelonMod
@@ -67,6 +68,12 @@ namespace JSMelonMod
 
         private static CursorLockMode lastLockMode;
         private static bool lastVisibleState;
+
+        public static GameObject CanvasRoot { get; private set; }
+
+        private static EventSystem jModEventSys;
+        private static EventSystem lastEventSys;
+        private static BaseInputModule lastInputModule;
 
         public static Key KeycodeToKey(KeyCode keyCode)
         {
@@ -328,8 +335,6 @@ namespace JSMelonMod
             }
         }
 
-
-
         // configInstantBoost
 
         [HarmonyPatch(typeof(SpaceShip_EngineController), nameof(SpaceShip_EngineController.BoostRechargeTime), MethodType.Getter)]
@@ -514,28 +519,40 @@ namespace JSMelonMod
 
         // configPlayerSpeedMultiplier
 
-        // Il2Cpp.Player_MovementHandler
-        [HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.AfterCharacterUpdate))]
+        private static float maxSlideSpeed = 16f;
+
+        [HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.Awake))]
         class LocalVelocityPatch1
         {
             static void Postfix(ref Player_MovementHandler __instance)
             {
-                if (configPlayerSpeedMultiplier.Value <= 1 || !__instance.IsOnGround)
-                {
-                    return;
-                }
-                Vector3 vectorMult = new Vector3(configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value);
-                Vector3 localV = Vector3.Scale(__instance.LocalMovementVelocity, vectorMult);
-                float maxSpeed = __instance.MaxMovementSpeed * configPlayerSpeedMultiplier.Value;
-                localV = Vector3.ClampMagnitude(localV, maxSpeed);
-                //Log("MovementHandler sprint local velocity multiplied: " + localV.magnitude + " sprint time " + __instance.SprintElapsedTime);
-                __instance.LocalMovementVelocity = localV;
+                maxSlideSpeed = (float)__instance?.m_PlayerController?.SlideSettings?.m_MaxSlideSpeed;
             }
         }
 
 
+        [HarmonyPatch(typeof(Player_MovementHandler), nameof(Player_MovementHandler.AfterCharacterUpdate))]
+        class LocalVelocityPatch2
+        {
+            static void Postfix(ref Player_MovementHandler __instance)
+            {
+                if (configPlayerSpeedMultiplier.Value <= 1f || !__instance.IsOnGround)
+                    return;
+                Vector3 vectorMult = new Vector3(configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value, configPlayerSpeedMultiplier.Value);
+                Vector3 localV = Vector3.Scale(__instance.LocalMovementVelocity, vectorMult);
+                float maxSpeed = __instance.MaxMovementSpeed * configPlayerSpeedMultiplier.Value;
+                if (__instance.m_PlayerBlackboardData.m_IsSliding.Value)
+                    __instance.m_PlayerController.SlideSettings.m_MaxSlideSpeed = maxSlideSpeed * configPlayerSpeedMultiplier.Value;
+
+
+                localV = Vector3.ClampMagnitude(localV, maxSpeed);
+                if (!__instance.m_PlayerBlackboardData.m_IsSliding.Value)
+                    __instance.LocalMovementVelocity = localV;
+            }
+        }
+
         // configInfiniteJump
-        // Keepsake.PlayerGameplayAbility OnDeactivate
+
         [HarmonyPatch(typeof(DoubleJumpAbility), nameof(DoubleJumpAbility.ShouldActivate))]
         class DoubleJumpAbilityPatch1
         {
@@ -589,6 +606,7 @@ namespace JSMelonMod
             JModStylePV.fontSize = 16;
             JModStylePV.fontStyle = FontStyle.Bold;
             JModStylePV.normal.textColor = JModColor;
+            JModStylePV.alignment = TextAnchor.MiddleCenter;
 
             ModConfCategory = MelonPreferences.CreateCategory("JModConfiguration");
             configMenuToggle = ModConfCategory.CreateEntry("ToggleKey", KeyCode.F7, "Main Menu Toggle Key");
@@ -631,6 +649,19 @@ namespace JSMelonMod
 
             Log("Menu key: " + configMenuToggle.Value.ToString());
 
+            CanvasRoot = new GameObject("JModCanvas");
+            UnityEngine.Object.DontDestroyOnLoad(CanvasRoot);
+            CanvasRoot.hideFlags |= HideFlags.HideAndDontSave;
+            CanvasRoot.layer = 5;
+            CanvasRoot.transform.position = new Vector3(0f, 0f, 1f);
+
+            CanvasRoot.SetActive(false);
+
+            jModEventSys = CanvasRoot.AddComponent<EventSystem>();
+            jModEventSys.enabled = false;
+
+            CanvasRoot.SetActive(true);
+
             Log("JS Mod Initialized.");
 
 
@@ -659,11 +690,23 @@ namespace JSMelonMod
                 lastVisibleState = UnityEngine.Cursor.visible;
                 UnityEngine.Cursor.lockState = CursorLockMode.None;
                 UnityEngine.Cursor.visible = true;
+                lastEventSys = EventSystem.current;
+                lastInputModule = EventSystem.current.currentInputModule;
+                lastEventSys.enabled = false;
+                lastInputModule.DeactivateModule();
+                jModEventSys.enabled = true;
+                jModEventSys.m_CurrentInputModule?.ActivateModule();
             }
             else
             {
                 UnityEngine.Cursor.lockState = lastLockMode;
                 UnityEngine.Cursor.visible = lastVisibleState;
+                InputSystem.TryResetDevice(Mouse.current);
+                jModEventSys.enabled = false;
+                jModEventSys.currentInputModule?.DeactivateModule();
+                lastEventSys.enabled = true;
+                lastInputModule.ActivateModule();
+                lastEventSys.m_CurrentInputModule = lastInputModule;
                 MelonPreferences.Save();
             }
             showCheatsPopup = !showCheatsPopup;
