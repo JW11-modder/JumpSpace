@@ -26,7 +26,7 @@ namespace JSPlayerModPlugin
         public const string GUID = "jw11-modder.JMod";
         public const string NAME = "JMod_bepin";
         public const string AUTHOR = "jw11-modder";
-        public const string VERSION = "1.0.4";
+        public const string VERSION = "1.0.5";
 
         public static ConfigEntry<bool> JModEnabled;
 
@@ -170,6 +170,7 @@ namespace JSPlayerModPlugin
                 showCheatsPopup = !showCheatsPopup;
                 Cursor.lockState = lastLockMode;
                 Cursor.visible = lastVisibleState;
+                InputSystem.TryResetDevice(Mouse.current);
                 jPlugin.Config.Save();
             }
         }
