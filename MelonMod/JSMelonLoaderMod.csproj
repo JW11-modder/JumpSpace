@@ -27,6 +27,9 @@
 		<Reference Include="Il2CppKeepsake.Common">
 		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\Il2CppAssemblies\Il2CppKeepsake.Common.dll</HintPath>
 		</Reference>
+		<Reference Include="Il2CppKeepsake.Simulation">
+		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\Il2CppAssemblies\Il2CppKeepsake.Simulation.dll</HintPath>
+		</Reference>
 		<Reference Include="Il2CppKeepsake.Simulation.Data">
 		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\Il2CppAssemblies\Il2CppKeepsake.Simulation.Data.dll</HintPath>
 		</Reference>
@@ -44,6 +47,9 @@
 		</Reference>
 		<Reference Include="Unity.InputSystem">
 		  <HintPath>lib\Unity.InputSystem.dll</HintPath>
+		</Reference>
+		<Reference Include="Unity.Netcode.Runtime">
+		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\Il2CppAssemblies\Unity.Netcode.Runtime.dll</HintPath>
 		</Reference>
 		<Reference Include="UnityEngine">
 		  <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\MelonLoader\Dependencies\Il2CppAssemblyGenerator\UnityDependencies\UnityEngine.dll</HintPath>
