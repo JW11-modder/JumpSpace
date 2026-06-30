@@ -15,6 +15,7 @@ using Il2CppKeepsake.HyperSpace.GameplayFeatures.Pickupables.RocketLauncher;
 using Il2CppKeepsake.HyperSpace.NewInputSystem;
 using Il2CppKeepsake.HyperSpace.System.Modifiers.ItemModule;
 using Il2CppKeepsake.MetaProgression;
+using Il2CppKeepsake.Pickupables.GenericWeapon;
 using Il2CppSystem;
 using Il2CppUniRx;
 using MelonLoader;
@@ -54,8 +55,10 @@ namespace JSMelonMod
         private static MelonPreferences_Entry<bool> configInfiniteJump;
         private static MelonPreferences_Entry<bool> configFreeRoam;
         private static MelonPreferences_Entry<bool> configBuddyUpgrade;
+        private static MelonPreferences_Entry<bool> configNoWeaponRecoil;
 
         private static MelonPreferences_Entry<float> configPlayerDamageMultiplier;
+        private static MelonPreferences_Entry<float> configFireRateMultiplier;
         private static MelonPreferences_Entry<float> configPlayerShipDamageMultiplier;
         private static MelonPreferences_Entry<float> configPlayerSpeedMultiplier;
         private static MelonPreferences_Entry<float> configBoostTimeMult;
@@ -170,8 +173,10 @@ namespace JSMelonMod
             configInfiniteJump = ToggleCategory.CreateEntry<bool>("configInfiniteJump", false, "Enable infinite double jump");
             configFreeRoam = ToggleCategory.CreateEntry<bool>("configFreeRoam", false, "Enable ship jump to any sector");
             configBuddyUpgrade = ToggleCategory.CreateEntry<bool>("configBuddyUpgrade", false, "Apply on foot damage multiplier to Buddy bot");
+            configNoWeaponRecoil = ToggleCategory.CreateEntry<bool>("configNoWeaponRecoil", false, "Remove recoil for on foot weapons");
 
             configPlayerDamageMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerDamageMultiplier", 1f, "Player damage multiplier (on foot)", validator: new ValueRange<float>(1f, 20f));
+            configFireRateMultiplier = MultiplierFloatCategory.CreateEntry<float>("configFireRateMultiplier", 1f, "Player fire rate multiplier (on foot)", validator: new ValueRange<float>(1f, 20f));
             configPlayerShipDamageMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerShipDamageMultiplier", 1f, "Player damage multiplier (spaceship)", validator: new ValueRange<float>(1f, 20f));
             configPlayerSpeedMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerSpeedMultiplier", 1f, "Player speed multiplier (on foot)", validator: new ValueRange<float>(1f, 5f));
             configBoostTimeMult = MultiplierFloatCategory.CreateEntry<float>("configBoostTimeMult", 1f, "Ship boost time multiplier", validator: new ValueRange<float>(1f, 20f));
@@ -325,14 +330,28 @@ namespace JSMelonMod
 
         //configNoPlayerShipShieldDamage
 
-        [HarmonyPatch(typeof(ShieldUnitsManager), nameof(ShieldUnitsManager.DealDamageToShields))]
+        /*[HarmonyPatch(typeof(ShieldUnitsManager), nameof(ShieldUnitsManager.DealDamageToShields))]
         class ShieldUnitsManagerPatch1
         {
-            public static void ILManipulator(MethodBase original)
+            static bool Prefix(ref float finalDamage, ref DamageInfo damageInfo)
             {
-                /*if (!configNoPlayerShipShieldDamage.Value)
+                if (!configNoPlayerShipShieldDamage.Value)
                     return true;
-                return false;*/
+                finalDamage = 0;
+                damageInfo.m_Damage = 0;
+                return true;
+            }
+        }*/
+        [HarmonyPatch(typeof(ShieldUnitsManager), nameof(ShieldUnitsManager.Update))]
+        class ShieldUnitsManagerPatch2
+        {
+            static bool Prefix(ref ShieldUnitsManager __instance)
+            {
+                if (!configNoPlayerShipShieldDamage.Value)
+                    return true;
+                if (__instance.m_Ship_StateBlackboardData.m_ShipShield.Value != __instance.m_Ship_StateBlackboardData.m_CurrentShipMaxShield.Value)
+                    __instance.m_Ship_StateBlackboardData.m_ShipShield.Value = __instance.m_Ship_StateBlackboardData.m_CurrentShipMaxShield.Value;
+                return true;
             }
         }
 
@@ -553,9 +572,13 @@ namespace JSMelonMod
         {
             static void Postfix(ref PickupableItem_Minigun __instance)
             {
-                if (!configNoPlayerReload.Value)
-                    return;
-                __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+                if (configNoPlayerReload.Value)
+                    __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+                if (configNoWeaponRecoil.Value)
+                {
+                    __instance.m_CameraRecoil.m_CurrentRecoil = Vector2.zero;
+                    __instance.m_CameraRecoil.m_TargetRecoil = Vector2.zero;
+                }
             }
         }
 
@@ -643,32 +666,6 @@ namespace JSMelonMod
             }
         }
 
-        // configPlayerDamageMultiplier
-
-        [HarmonyPatch(typeof(PickupableItemFirstPerson_Base), nameof(PickupableItemFirstPerson_Base.ShootProjectile))]
-        class FPGunPatch1
-        {
-            static bool Prefix(ref float interiorDamage, ref float shipDamage)
-            {
-                if (configPlayerDamageMultiplier.Value <= 1f)
-                    return true;
-                interiorDamage *= configPlayerDamageMultiplier.Value;
-                shipDamage *= configPlayerDamageMultiplier.Value;
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(PlayerMeleeHandler), nameof(PlayerMeleeHandler.GetDamage))]
-        class MeleePatch1
-        {
-            static void Postfix(ref PlayerMeleeHandler __instance, ref float __result)
-            {
-                if (configPlayerDamageMultiplier.Value <= 1f)
-                    return;
-                __result *= configPlayerDamageMultiplier.Value;
-            }
-        }
-
         // configBuddyUpgrade
 
         static bool buddyDam = false;
@@ -687,6 +684,86 @@ namespace JSMelonMod
             }
         }
 
+        // configNoWeaponRecoil
+
+        [HarmonyPatch(typeof(PickupableItemFirstPerson_GenericWeapon), nameof(PickupableItemFirstPerson_GenericWeapon.Shoot))]
+        class FPGunPatch2
+        {
+            static void Postfix(ref PickupableItemFirstPerson_GenericWeapon __instance)
+            {
+                if (!configNoWeaponRecoil.Value)
+                    return;
+                __instance.m_Recoil.m_CurrentRecoil = Vector2.zero;
+                __instance.m_Recoil.m_TargetRecoil = Vector2.zero;
+            }
+        }
+        [HarmonyPatch(typeof(PickupableItem_Minigun), nameof(PickupableItem_Minigun.Tick))]
+        class MinigunPatch2
+        {
+            static void Postfix(ref PickupableItem_Minigun __instance)
+            {
+                if (configNoPlayerReload.Value)
+                    __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+                if (configNoWeaponRecoil.Value)
+                {
+                    __instance.m_CameraRecoil.m_CurrentRecoil = Vector2.zero;
+                    __instance.m_CameraRecoil.m_TargetRecoil = Vector2.zero;
+                }
+            }
+        }
+
+        // configPlayerDamageMultiplier
+
+        [HarmonyPatch(typeof(PickupableItemFirstPerson_Base), nameof(PickupableItemFirstPerson_Base.ShootProjectile))]
+        class FPGunPatch1
+        {
+            static bool Prefix(ref float interiorDamage, ref float shipDamage)
+            {
+                if (configPlayerDamageMultiplier.Value <= 1f)
+                    return true;
+                interiorDamage *= configPlayerDamageMultiplier.Value;
+                shipDamage *= configPlayerDamageMultiplier.Value;
+                return true;
+            }
+        }
+        [HarmonyPatch(typeof(PlayerMeleeHandler), nameof(PlayerMeleeHandler.GetDamage))]
+        class MeleePatch1
+        {
+            static void Postfix(ref PlayerMeleeHandler __instance, ref float __result)
+            {
+                if (configPlayerDamageMultiplier.Value <= 1f)
+                    return;
+                __result *= configPlayerDamageMultiplier.Value;
+            }
+        }
+
+        // configFireRateMultiplier
+
+        [HarmonyPatch(typeof(PickupableItemFirstPerson_GenericWeapon), nameof(PickupableItemFirstPerson_GenericWeapon.SetupFirstPersonItem))]
+        class FPGunPatch3
+        {
+            static Dictionary<string, float> fireRateDict = [];
+            static void Postfix(ref PickupableItemFirstPerson_GenericWeapon __instance)
+            {
+                if (configFireRateMultiplier.Value <= 1f)
+                    return;
+                float currentFR = __instance.WeaponData.m_FireRate / configFireRateMultiplier.Value;
+                if (!fireRateDict.ContainsKey(__instance.WeaponData.m_AssetGUID))
+                {
+                    fireRateDict.Add(__instance.WeaponData.m_AssetGUID, currentFR);
+                    Log("Changed weapon fire rate " + currentFR + " " + __instance.WeaponData.m_AssetGUID);
+                    __instance.WeaponData.m_FireRate = currentFR;
+                }
+                else
+                    if (fireRateDict[__instance.WeaponData.m_AssetGUID] != __instance.WeaponData.m_FireRate)
+                    {
+                        fireRateDict[__instance.WeaponData.m_AssetGUID] = currentFR;
+                        Log("Changed weapon fire rate " + currentFR + " " + __instance.WeaponData.m_AssetGUID);
+                        __instance.WeaponData.m_FireRate = currentFR;
+                    }
+            }
+        }
+
         // configPlayerShipDamageMultiplier
 
         [HarmonyPatch(typeof(SpaceShip_Cannon_Base), nameof(SpaceShip_Cannon_Base.SafeStart))]
@@ -697,10 +774,9 @@ namespace JSMelonMod
             {
                 public float hullDamage;
                 public float shieldDamage;
-                public int stationId;
             }
 
-            static Dictionary<int, ShipCannon> shipCannonsDict = new();
+            static Dictionary<int, ShipCannon> shipCannonsDict = [];
             static bool Prefix(ref SpaceShip_Cannon_Base __instance)
             {
                 if (configPlayerShipDamageMultiplier.Value <= 1 || __instance.TracerProjectileData == null)
@@ -712,7 +788,6 @@ namespace JSMelonMod
                 {
                     hullDamage = __instance.TracerProjectileData.ShipHullDamage * configPlayerShipDamageMultiplier.Value,
                     shieldDamage = __instance.TracerProjectileData.ShipshieldDamage * configPlayerShipDamageMultiplier.Value,
-                    stationId = __instance.CombatStationID
                 };
                 if (!shipCannonsDict.ContainsKey(__instance.CombatStationID))
                 {
