@@ -54,6 +54,9 @@
     <Reference Include="Unity.InputSystem.ForUI">
       <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Unity.InputSystem.ForUI.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.Localization">
+      <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Unity.Localization.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.Netcode.Runtime">
       <HintPath>L:\Games\Steam\steamapps\common\JumpSpace\BepInEx\interop\Unity.Netcode.Runtime.dll</HintPath>
     </Reference>

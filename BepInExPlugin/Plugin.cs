@@ -47,15 +47,17 @@ public class Plugin : BasePlugin
     public static ConfigEntry<bool> configInfiniteJump;
     public static ConfigEntry<bool> configFreeRoam;
     public static ConfigEntry<bool> configBuddyUpgrade;
+    public static ConfigEntry<bool> configNoWeaponRecoil;
 
-    public static ConfigEntry<float> configMateriaMultiplier;
     public static ConfigEntry<float> configPlayerDamageMultiplier;
+    public static ConfigEntry<float> configFireRateMultiplier;
     public static ConfigEntry<float> configPlayerShipDamageMultiplier;
     public static ConfigEntry<float> configPlayerSpeedMultiplier;
-    public static ConfigEntry<float> configPlayerXPMultiplier;
     public static ConfigEntry<float> configBoostTimeMult;
-    public static ConfigEntry<float> configIngotMultiplier;
+    public static ConfigEntry<float> configMateriaMultiplier;
     public static ConfigEntry<float> configCreditsMultiplier;
+    public static ConfigEntry<float> configIngotMultiplier;
+    public static ConfigEntry<float> configPlayerXPMultiplier;
 
 
 
@@ -114,12 +116,20 @@ public class Plugin : BasePlugin
                                     "EnableBuddyUpgrade",
                                     false,
                                     "Apply on foot damage multiplier to Buddy bot");
+        configNoWeaponRecoil = Config.Bind("Toggles",
+                                    "EnableNoWeaponRecoil",
+                                    false,
+                                    "Remove recoil for on foot weapons");
 
 
         configPlayerDamageMultiplier = Config.Bind("MultFloat",
                                     "PlayerDamageMultiplier",
                                     1f,
                                     "Player damage multiplier (on foot)");
+        configFireRateMultiplier = Config.Bind("MultFloat",
+                                    "FireRateMultiplier",
+                                    1f,
+                                    "Player fire rate multiplier (on foot)");
         configPlayerShipDamageMultiplier = Config.Bind("MultFloat",
                                     "PlayerShipDamageMultiplier",
                                     1f,
@@ -135,7 +145,7 @@ public class Plugin : BasePlugin
         configMateriaMultiplier = Config.Bind("MultFloat",
                                     "MateriaMultiplier",
                                     1f,
-                                    "Materia disassemble gains multiplier");
+                                    "Materia gains multiplier");
         configCreditsMultiplier = Config.Bind("MultFloat",
                                     "CreditsMultiplier",
                                     1f,
@@ -237,11 +247,13 @@ public class Plugin : BasePlugin
     [HarmonyPatch(typeof(ShieldUnitsManager), nameof(ShieldUnitsManager.DealDamageToShields))]
     class ShieldUnitsManagerPatch1
     {
-        static bool Prefix()
+        static bool Prefix(ref float finalDamage, ref DamageInfo damageInfo)
         {
             if (!configNoPlayerShipShieldDamage.Value)
                 return true;
-            return false;
+            finalDamage = 0;
+            damageInfo.m_Damage = 0;
+            return true;
         }
     }
 
@@ -353,17 +365,16 @@ public class Plugin : BasePlugin
             return false;
         }
     }
-    /*[HarmonyPatch(typeof(ItemGenerator), nameof(ItemGenerator.GenerateForTemplate))]
+/*    [HarmonyPatch(typeof(ItemGenerator), nameof(ItemGenerator.GenerateForTemplate))]
     class ItemGeneratorPatch2
     {
 
-        static bool Prefix(ItemGenerationConfig config, ref float __result)
+        static bool Prefix()
         {
             if (!configMaxRarity.Value)
                 return true;
-            __result = 1f;
-            Log.LogInfo("Item generated with all modules: " + config.name);
-            return false;
+            Log.LogInfo("Item generated from template");
+            return true;
         }
     }*/
     /*[HarmonyPatch(typeof(ItemGenerator), nameof(ItemGenerator.Generate), new System.Type[] { typeof(PickupableItem_Data), typeof(int), typeof(Il2CppSystem.Random) })]
@@ -456,9 +467,13 @@ public class Plugin : BasePlugin
     {
         static void Postfix(ref PickupableItem_Minigun __instance)
         {
-            if (!configNoPlayerReload.Value)
-                return;
-            __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+            if (configNoPlayerReload.Value)
+                __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+            if (configNoWeaponRecoil.Value)
+            {
+                __instance.m_CameraRecoil.m_CurrentRecoil = Vector2.zero;
+                __instance.m_CameraRecoil.m_TargetRecoil = Vector2.zero;
+            }
         }
     }
 
@@ -564,6 +579,34 @@ public class Plugin : BasePlugin
         }
     }
 
+    // configNoWeaponRecoil
+
+    [HarmonyPatch(typeof(PickupableItemFirstPerson_GenericWeapon), nameof(PickupableItemFirstPerson_GenericWeapon.Shoot))]
+    class FPGunPatch2
+    {
+        static void Postfix(ref PickupableItemFirstPerson_GenericWeapon __instance)
+        {
+            if (!configNoWeaponRecoil.Value)
+                return;
+            __instance.m_Recoil.m_CurrentRecoil = Vector2.zero;
+            __instance.m_Recoil.m_TargetRecoil = Vector2.zero;
+        }
+    }
+    [HarmonyPatch(typeof(PickupableItem_Minigun), nameof(PickupableItem_Minigun.Tick))]
+    class MinigunPatch2
+    {
+        static void Postfix(ref PickupableItem_Minigun __instance)
+        {
+            if (configNoPlayerReload.Value)
+                __instance.m_PickupableItemBlackboardData.m_ResourceAmount.Value = __instance.m_ItemData.m_MaxResourceAmountToCarry;
+            if (configNoWeaponRecoil.Value)
+            {
+                __instance.m_CameraRecoil.m_CurrentRecoil = Vector2.zero;
+                __instance.m_CameraRecoil.m_TargetRecoil = Vector2.zero;
+            }
+        }
+    }
+
     // configPlayerDamageMultiplier
 
     [HarmonyPatch(typeof(PickupableItemFirstPerson_Base), nameof(PickupableItemFirstPerson_Base.ShootProjectile))]
@@ -578,7 +621,6 @@ public class Plugin : BasePlugin
             return true;
         }
     }
-
     [HarmonyPatch(typeof(PlayerMeleeHandler), nameof(PlayerMeleeHandler.GetDamage))]
     class MeleePatch1
     {
@@ -587,6 +629,33 @@ public class Plugin : BasePlugin
             if (configPlayerDamageMultiplier.Value <= 1f)
                 return;
             __result *= configPlayerDamageMultiplier.Value;
+        }
+    }
+
+    // configFireRateMultiplier
+
+    [HarmonyPatch(typeof(PickupableItemFirstPerson_GenericWeapon), nameof(PickupableItemFirstPerson_GenericWeapon.SetupFirstPersonItem))]
+    class FPGunPatch3
+    {
+        static Dictionary<string, float> fireRateDict = new();
+        static void Postfix(ref PickupableItemFirstPerson_GenericWeapon __instance)
+        {
+            if (configFireRateMultiplier.Value <= 1f)
+                return;
+            float currentFR = __instance.WeaponData.m_FireRate / configFireRateMultiplier.Value;
+            if (!fireRateDict.ContainsKey(__instance.WeaponData.m_AssetGUID))
+            {
+                fireRateDict.Add(__instance.WeaponData.m_AssetGUID, currentFR);
+                Log.LogInfo("Changed weapon fire rate " + currentFR + " " + __instance.WeaponData.m_AssetGUID);
+                __instance.WeaponData.m_FireRate = currentFR;
+            }
+            else
+                if (fireRateDict[__instance.WeaponData.m_AssetGUID] != __instance.WeaponData.m_FireRate)
+                {
+                    fireRateDict[__instance.WeaponData.m_AssetGUID] = currentFR;
+                    Log.LogInfo("Changed weapon fire rate " + currentFR + " " + __instance.WeaponData.m_AssetGUID);
+                    __instance.WeaponData.m_FireRate = currentFR;
+                }
         }
     }
 
@@ -600,7 +669,6 @@ public class Plugin : BasePlugin
         {
             public float hullDamage;
             public float shieldDamage;
-            public int stationId;
         }
 
         static Dictionary<int, ShipCannon> shipCannonsDict = new();
@@ -615,7 +683,6 @@ public class Plugin : BasePlugin
             {
                 hullDamage = __instance.TracerProjectileData.ShipHullDamage * configPlayerShipDamageMultiplier.Value,
                 shieldDamage = __instance.TracerProjectileData.ShipshieldDamage * configPlayerShipDamageMultiplier.Value,
-                stationId = __instance.CombatStationID
             };
             if (!shipCannonsDict.ContainsKey(__instance.CombatStationID))
             {
@@ -692,8 +759,6 @@ public class Plugin : BasePlugin
                 return true;
             __instance.m_CurrencyRewardMultiplier = configIngotMultiplier.Value;
             __instance.m_ExperienceRewardMultiplier = configPlayerXPMultiplier.Value;
-            Log.LogInfo("CURRENCY VALUE MULTIPLIER (mission): " + __instance.m_CurrencyRewardMultiplier);
-            Log.LogInfo("EXPERIENCE VALUE MULTIPLIER (mission): " + __instance.m_ExperienceRewardMultiplier);
             return true;
         }
     }
