@@ -58,6 +58,7 @@ public class Plugin : BasePlugin
     public static ConfigEntry<float> configCreditsMultiplier;
     public static ConfigEntry<float> configIngotMultiplier;
     public static ConfigEntry<float> configPlayerXPMultiplier;
+    public static ConfigEntry<float> configBuddyFRMultiplier;
 
 
 
@@ -158,6 +159,10 @@ public class Plugin : BasePlugin
                                     "PlayerXPMultiplier",
                                     1f,
                                     "Mission player XP reward multiplier");
+        configBuddyFRMultiplier = Config.Bind("MultFloat",
+                                    "BuddyFRMultiplier",
+                                    1f,
+                                    "Buddy bot fire rate multiplier");
 
 
 
@@ -829,6 +834,23 @@ public class Plugin : BasePlugin
             localV = Vector3.ClampMagnitude(localV, maxSpeed);
             if (!__instance.m_PlayerBlackboardData.m_IsSliding.Value)
                 __instance.LocalMovementVelocity = localV;
+        }
+    }
+
+    // configBuddyFRMultiplier
+
+    static bool buddyFR = false;
+
+    [HarmonyPatch(typeof(AI_Behaviour_OnFootBuddy_Hostile), nameof(AI_Behaviour_OnFootBuddy_Hostile.SafeStart))]
+    class BuddyFRPatch1
+    {
+        static void Postfix(ref AI_Behaviour_OnFootBuddy_Hostile __instance)
+        {
+            if (configBuddyFRMultiplier.Value <= 1f || buddyFR)
+                return;
+            __instance.m_FireRate /= configBuddyFRMultiplier.Value;
+            Log.LogInfo("BuddyBot fire rate " + __instance.m_FireRate);
+            buddyFR = true;
         }
     }
 
