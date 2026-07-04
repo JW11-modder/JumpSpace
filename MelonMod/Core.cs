@@ -31,7 +31,7 @@ using static MelonLoader.MelonLogger;
 
 
 
-[assembly: MelonInfo(typeof(JSMelonMod.Core), "jw11-modder.JSMelonLoaderMod", "1.1.6", "jw11-modder", null)]
+[assembly: MelonInfo(typeof(JSMelonMod.Core), "jw11-modder.JSMelonLoaderMod", "1.1.7", "jw11-modder", null)]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 
 namespace JSMelonMod
@@ -66,6 +66,7 @@ namespace JSMelonMod
         private static MelonPreferences_Entry<float> configCreditsMultiplier;
         private static MelonPreferences_Entry<float> configIngotMultiplier;
         private static MelonPreferences_Entry<float> configPlayerXPMultiplier;
+        private static MelonPreferences_Entry<float> configBuddyFRMultiplier;
 
         public static MelonPreferences_Entry<KeyCode> configMenuToggle;
 
@@ -184,6 +185,7 @@ namespace JSMelonMod
             configCreditsMultiplier = MultiplierFloatCategory.CreateEntry<float>("configCreditsMultiplier", 1f, "Pickup credits multiplier", validator: new ValueRange<float>(1f, 20f));
             configIngotMultiplier = MultiplierFloatCategory.CreateEntry<float>("configIngotMultiplier", 1f, "Mission reward multiplier (credits and ingots)", validator: new ValueRange<float>(1f, 20f));
             configPlayerXPMultiplier = MultiplierFloatCategory.CreateEntry<float>("configPlayerXPMultiplier", 1f, "Mission player XP reward multiplier", validator: new ValueRange<float>(1f, 20f));
+            configBuddyFRMultiplier = MultiplierFloatCategory.CreateEntry<float>("configBuddyFRMultiplier", 1f, "Buddy Bot fire rate multiplier", validator: new ValueRange<float>(1f, 20f));
 
             JModStyleH.alignment = TextAnchor.MiddleCenter;
             JModStyleH.fontSize = 20;
@@ -298,7 +300,7 @@ namespace JSMelonMod
         }
 
         [HarmonyPatch(typeof(shipref), nameof(shipref.Update))]
-        class shipref_UpdatePatch1
+        class Shipref_UpdatePatch1
         {
             static void Postfix(ref shipref __instance)
             {
@@ -936,6 +938,24 @@ namespace JSMelonMod
                     __instance.LocalMovementVelocity = localV;
             }
         }
+
+        // configBuddyFRMultiplier
+
+        static bool buddyFR = false;
+
+        [HarmonyPatch(typeof(AI_Behaviour_OnFootBuddy_Hostile), nameof(AI_Behaviour_OnFootBuddy_Hostile.SafeStart))]
+        class BuddyFRPatch1
+        {
+            static void Postfix(ref AI_Behaviour_OnFootBuddy_Hostile __instance)
+            {
+                if (configBuddyFRMultiplier.Value <= 1f || buddyFR)
+                    return;
+                __instance.m_FireRate /= configBuddyFRMultiplier.Value;
+                Log("BuddyBot fire rate " + __instance.m_FireRate);
+                buddyFR = true;
+            }
+        }
+
 
         // MAIN MOD FUNCTIONS
 
